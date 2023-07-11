@@ -1,0 +1,431 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>银行家算法模拟系统</title>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script>
+        const request = axios.create({
+            baseURL: 'http://localhost:8080',
+            timeout: 5000
+        })
+
+        function init() {
+            let param = {
+                "processesNumber": parseInt(document.getElementById("processes").value),
+                "assetsNumber": parseInt(document.getElementById("assets").value)
+            }
+            request.post("/bank/initNumber", param).then(res => {
+                if (res.status === 200) {
+                    if (res.data.code === 200) {
+                        document.getElementById("inputAssets").innerHTML = "请输入每个资源对应的available"
+                        let inputAssetsBody = document.getElementById("inputAssetsBody");
+
+                        for (let i = 1; i <= param.assetsNumber; i++) {
+                            let newElement = document.createElement("p");
+                            let textNode = document.createTextNode("资源 " + i + ": ");
+                            newElement.appendChild(textNode);
+                            let inputField = document.createElement("input");
+                            inputField.type = "text";
+                            inputField.id = "assets" + i
+                            newElement.insertBefore(inputField, textNode.nextSibling);
+                            inputAssetsBody.appendChild(newElement);
+                        }
+                        let button = document.createElement("button");
+                        button.innerHTML = "确认"
+                        button.onclick = function() {
+                            let params = []
+                            for (let i = 1; i <= param.assetsNumber ; i++) {
+                                params.push(parseInt(document.getElementById("assets" + i).value))
+                            }
+                            for (let i = 0; i < params.length; i++) {
+                                if (isNaN(params.at(i))) {
+                                    window.alert("请检查参数是否正确")
+                                    return
+                                }
+                            }
+                            request.post("/bank/initAssets", params).then(r => {
+                                if (r.status === 200) {
+                                    if (r.data.code === 200) {
+                                        var inputMaxAndAll = document.getElementById("inputMaxAndAll");
+                                        inputMaxAndAll.innerHTML = "请输入对应需求和分配情况"
+                                        let processName = document.getElementById("processName");
+                                        let maxInfo = document.getElementById("maxInfo");
+                                        let allocationInfo = document.getElementById("allocationInfo");
+                                        let needInfo = document.getElementById("needInfo");
+                                        let finalButton = document.getElementById("finalButton");
+                                        processName.style.display = "block"
+                                        maxInfo.style.display = "block"
+                                        allocationInfo.style.display = "block"
+                                        needInfo.style.display = "block"
+                                        finalButton.style.display = "inline-block"
+                                        finalButton.onclick = function () {
+                                            let need = []
+                                            let max = []
+                                            let allocation = []
+                                            for (let i = 0; i < param.processesNumber; i++) {
+                                                for (let j = 0; j < param.assetsNumber; j++) {
+                                                    let maxNumber = parseInt(document.getElementById(i + "maxNumber" + j).value)
+                                                    let allocationNumber = parseInt(document.getElementById(i + "allocationNumber" + j).value)
+                                                    if (isNaN(maxNumber) || isNaN(allocationNumber)) {
+                                                        window.alert("请检查参数是否正确")
+                                                        return
+                                                    }
+                                                    max.push(maxNumber)
+                                                    allocation.push(allocationNumber)
+                                                    need.push(maxNumber - allocationNumber)
+                                                }
+                                            }
+                                            for (let i = 0; i < (need.length / param.assetsNumber); i++) {
+                                                let div = document.createElement("div")
+                                                div.style.width = "100%"
+                                                div.style.height = "30px"
+                                                div.style.marginTop = "5px"
+                                                div.style.display = "flex"
+                                                for (let j = 0; j < param.assetsNumber; j++) {
+                                                    let divSon = document.createElement("div")
+                                                    divSon.style.width = "30px"
+                                                    divSon.style.marginRight = "5px"
+                                                    divSon.innerHTML = need.at(i * param.assetsNumber + j)
+                                                    div.appendChild(divSon)
+                                                }
+                                                needInfo.appendChild(div)
+                                            }
+                                            let paramInfo = {
+                                                "max": max,
+                                                "allocation": allocation,
+                                                "need" : need
+                                            }
+                                            request.post("/bank/initOtherAndMath", paramInfo).then(result => {
+                                                if (result.status === 200) {
+                                                    let resultElement = document.getElementById("result");
+                                                    needInfo.innerHTML = "Need(无须输入，确认后自动算出)"
+                                                    for (let i = 0; i < (need.length / param.assetsNumber); i++) {
+                                                        let div = document.createElement("div")
+                                                        div.style.width = "100%"
+                                                        div.style.height = "30px"
+                                                        div.style.marginTop = "5px"
+                                                        div.style.display = "flex"
+                                                        for (let j = 0; j < param.assetsNumber; j++) {
+                                                            let divSon = document.createElement("div")
+                                                            divSon.style.width = "30px"
+                                                            divSon.style.marginRight = "5px"
+                                                            divSon.id = i + "needDiv" + j
+                                                            divSon.innerHTML = need.at(i * param.assetsNumber + j)
+                                                            div.appendChild(divSon)
+                                                        }
+                                                        needInfo.appendChild(div)
+                                                    }
+                                                    if (result.data.code === 200) {
+                                                        let str = "该资源是安全的;安全序列为:"
+                                                        for (let i = 1; i < result.data.data.length ; i++) {
+                                                            str = str + result.data.data.at(i - 1) + "=>"
+                                                        }
+                                                        str = str + result.data.data.at(result.data.data.length - 1)
+                                                        resultElement.innerHTML = str
+                                                        let requestTitle = document.getElementById("request");
+                                                        requestTitle.innerHTML = "请选择接下来的操作"
+                                                        let requestDiv = document.getElementById("requestDiv");
+                                                        requestDiv.style.display = "block"
+                                                        let applyMain = document.getElementById("apply");
+                                                        let applyPro = document.createElement("div");
+                                                        applyPro.style.marginLeft = "40%"
+                                                        applyPro.innerHTML = "请选择申请的进程名："
+                                                        applyMain.appendChild(applyPro)
+                                                        let selectApply = document.createElement("select");
+                                                        selectApply.id = "selectApply"
+                                                        selectApply.style.height = "25px"
+                                                        for (let i = 0; i < param.processesNumber; i++) {
+                                                            const newOption = document.createElement("option");
+                                                            newOption.value = i;
+                                                            newOption.text = "进程" + (i + 1);
+                                                            selectApply.appendChild(newOption)
+                                                        }
+                                                        applyMain.appendChild(selectApply)
+                                                        let applyDoc = document.createElement("div");
+                                                        applyDoc.style.marginLeft = "5px"
+                                                        applyDoc.style.marginRight = "5px"
+                                                        applyDoc.innerHTML = "请输入申请资源数："
+                                                        applyMain.appendChild(applyDoc)
+                                                        for (let j = 0; j < param.assetsNumber; j++) {
+                                                            let input = document.createElement("input");
+                                                            input.type = "text";
+                                                            input.style.height = "15px"
+                                                            input.style.width = "30px"
+                                                            input.style.marginLeft = "5px"
+                                                            input.id = "selectApply" + j
+                                                            applyMain.appendChild(input);
+                                                        }
+                                                        let applyButton = document.createElement("button");
+                                                        applyButton.style.marginLeft = "5px"
+                                                        applyButton.style.width = "50px"
+                                                        applyButton.style.height = "25px"
+                                                        applyButton.innerHTML = "确认"
+                                                        applyButton.onclick = function () {
+                                                            let requestList = []
+                                                            for (let i = 0; i < param.assetsNumber; i++) {
+                                                                if (isNaN(parseInt(document.getElementById("selectApply" + i).value)))
+                                                                    window.alert("请检测参数是否正确")
+                                                                else
+                                                                    requestList.push(parseInt(document.getElementById("selectApply" + i).value))
+                                                            }
+                                                            let requestParam = {
+                                                                processNum: parseInt(document.getElementById("selectApply").value),
+                                                                requestList: requestList
+                                                            }
+                                                            request.post("/bank/addRequest", requestParam).then(resultForAdd => {
+                                                                if (resultForAdd.status === 200) {
+                                                                    if (resultForAdd.data.code === 200 || resultForAdd.data.code === 201) {
+                                                                        for (let i = 0; i < param.assetsNumber; i++) {
+                                                                            let elementById = document.getElementById(parseInt(document.getElementById("selectApply").value) + "allocationNumber" + i);
+                                                                            elementById.value = (parseInt(elementById.value) + requestList.at(i)).toString()
+                                                                            let elementById1 = document.getElementById(parseInt(document.getElementById("selectApply").value) + "needDiv" + i);
+                                                                            elementById1.innerHTML = (parseInt(elementById1.innerHTML) - requestList.at(i)).toString()
+                                                                            document.getElementById("assets" + (i + 1)).value = (parseInt(document.getElementById("assets" + (i + 1)).value) - requestList.at(i)).toString()
+                                                                        }
+                                                                        if (resultForAdd.data.code === 200) {
+                                                                            let str = "该资源是安全的;安全序列为:"
+                                                                            for (let i = 1; i < resultForAdd.data.data.length ; i++) {
+                                                                                str = str + resultForAdd.data.data.at(i - 1) + "=>"
+                                                                            }
+                                                                            str = str + resultForAdd.data.data.at(resultForAdd.data.data.length - 1)
+                                                                            resultElement.innerHTML = str
+                                                                        } else {
+                                                                            resultElement.innerHTML = resultForAdd.data.data
+                                                                        }
+                                                                    } else {
+                                                                        resultElement.innerHTML = resultForAdd.data.data
+                                                                    }
+                                                                }
+                                                            })
+                                                        }
+                                                        applyMain.appendChild(applyButton)
+
+                                                        let releaseMain = document.getElementById("release");
+                                                        let releasePro = document.createElement("div");
+                                                        releasePro.style.marginLeft = "40%"
+                                                        releasePro.innerHTML = "请选择释放的进程名："
+                                                        releaseMain.appendChild(releasePro)
+                                                        let releaseRelease = document.createElement("select");
+                                                        releaseRelease.id = "selectRelease"
+                                                        releaseRelease.style.height = "25px"
+                                                        for (let i = 0; i < param.processesNumber; i++) {
+                                                            const newOption = document.createElement("option");
+                                                            newOption.value = i;
+                                                            newOption.text = "进程" + (i + 1);
+                                                            releaseRelease.appendChild(newOption)
+                                                        }
+                                                        releaseMain.appendChild(releaseRelease)
+                                                        let releaseButton = document.createElement("button");
+                                                        releaseButton.style.marginLeft = "5px"
+                                                        releaseButton.style.width = "50px"
+                                                        releaseButton.style.height = "25px"
+                                                        releaseButton.innerHTML = "确认"
+                                                        releaseButton.onclick = function () {
+                                                            let requestParam = {
+                                                                processNum: parseInt(document.getElementById("selectRelease").value),
+                                                                requestList: []
+                                                            }
+                                                            request.post("/bank/deleteRequest", requestParam).then(resultForAdd => {
+                                                                console.log(resultForAdd)
+                                                            })
+                                                        }
+                                                        releaseMain.appendChild(releaseButton)
+
+                                                        let addPro = document.getElementById("addPro");
+                                                        for (let j = 0; j < param.assetsNumber; j++) {
+                                                            let input = document.createElement("input");
+                                                            input.type = "text";
+                                                            input.style.height = "15px"
+                                                            input.style.width = "30px"
+                                                            input.style.marginLeft = "5px"
+                                                            input.id = "addPro" + j
+                                                            addPro.appendChild(input);
+                                                        }
+                                                        let addProButton = document.getElementById("addProButton")
+                                                        addProButton.onclick = function () {
+                                                            let addList = []
+                                                            for (let j = 0; j < param.assetsNumber; j++) {
+                                                                let addProParam = document.getElementById("addPro" + j);
+                                                                let value = parseInt(addProParam.value)
+                                                                if (!isNaN(value))
+                                                                    addList.push(value)
+                                                                else
+                                                                    window.alert("请检查参数")
+                                                            }
+                                                            let addParam = {
+                                                                "processNum": (param.processesNumber + 1),
+                                                                "requestList": addList
+                                                            }
+                                                            request.post("/bank/addPro", addParam).then(addResult => {
+                                                                if (addResult.status === 200) {
+                                                                    if (addResult.data.code === 200) {
+                                                                        param.processesNumber += 1
+                                                                        let div = document.createElement("div")
+                                                                        div.style.width = "100%"
+                                                                        div.style.height = "30px"
+                                                                        div.style.marginTop = "5px"
+                                                                        div.innerHTML = "进程" + param.processesNumber
+                                                                        processName.appendChild(div)
+                                                                        let div2 = document.createElement("div")
+                                                                        div2.style.width = "100%"
+                                                                        div2.style.height = "30px"
+                                                                        div2.style.marginTop = "5px"
+                                                                        for (let j = 0; j < param.assetsNumber; j++) {
+                                                                            let input = document.createElement("input");
+                                                                            input.type = "text";
+                                                                            input.value = addList.at(j)
+                                                                            input.style.width = "30px"
+                                                                            input.style.marginRight = "5px"
+                                                                            input.id = param.processesNumber + "maxNumber" + j
+                                                                            div2.appendChild(input);
+                                                                        }
+                                                                        maxInfo.appendChild(div2)
+                                                                        let div3 = document.createElement("div")
+                                                                        div3.style.width = "100%"
+                                                                        div3.style.height = "30px"
+                                                                        div3.style.marginTop = "5px"
+                                                                        for (let j = 0; j < param.assetsNumber; j++) {
+                                                                            let input = document.createElement("input");
+                                                                            input.type = "text";
+                                                                            input.value = "0"
+                                                                            input.style.width = "30px"
+                                                                            input.style.marginRight = "5px"
+                                                                            input.id = param.processesNumber  + "allocationNumber" + j
+                                                                            div3.appendChild(input);
+                                                                        }
+                                                                        allocationInfo.appendChild(div3)
+                                                                        resultElement.innerHTML = "新增成功"
+                                                                    }
+                                                                    else
+                                                                        resultElement.innerHTML = addResult.data.data
+                                                                }
+                                                            })
+
+                                                        }
+                                                    } else {
+                                                        resultElement.innerHTML = result.data.data
+                                                    }
+                                                }
+                                            })
+                                        }
+                                        for (let i = 1; i <= param.processesNumber; i++) {
+                                            let div = document.createElement("div")
+                                            div.style.width = "100%"
+                                            div.style.height = "30px"
+                                            div.style.marginTop = "5px"
+                                            div.innerHTML = "进程" + i
+                                            processName.appendChild(div)
+                                        }
+                                        for (let i = 0; i < param.processesNumber; i++) {
+                                            let div = document.createElement("div")
+                                            div.style.width = "100%"
+                                            div.style.height = "30px"
+                                            div.style.marginTop = "5px"
+                                            for (let j = 0; j < param.assetsNumber; j++) {
+                                                let input = document.createElement("input");
+                                                input.type = "text";
+                                                input.style.width = "30px"
+                                                input.style.marginRight = "5px"
+                                                input.id = i + "maxNumber" + j
+                                                div.appendChild(input);
+                                            }
+                                            maxInfo.appendChild(div)
+                                        }
+                                        for (let i = 0; i < param.processesNumber; i++) {
+                                            let div = document.createElement("div")
+                                            div.style.width = "100%"
+                                            div.style.height = "30px"
+                                            div.style.marginTop = "5px"
+                                            for (let j = 0; j < param.assetsNumber; j++) {
+                                                let input = document.createElement("input");
+                                                input.type = "text";
+                                                input.style.width = "30px"
+                                                input.style.marginRight = "5px"
+                                                input.id = i + "allocationNumber" + j
+                                                div.appendChild(input);
+                                            }
+                                            allocationInfo.appendChild(div)
+                                        }
+                                    }
+                                } else {
+                                    window.alert(res.data.data)
+                                }
+                            })
+                        }
+                        inputAssetsBody.appendChild(button)
+                    } else {
+                        window.alert(res.data.data)
+                    }
+                }
+            })
+        }
+
+    function reload() {
+        window.location.reload()
+    }
+
+    </script>
+</head>
+
+<body>
+<div style="width: 100%; height: 100%; text-align: center">
+    请输入进程数:
+    <input type="text" id="processes" style="margin-top: 10px"/><br/>
+    请输入资源数:
+    <input type="text" id="assets" style="margin-top: 10px"/><br/>
+    <button id="initButton" style="width:50px; margin-top: 10px" onclick="init()">
+        确认
+    </button>
+    <h4 id="inputAssets"></h4>
+    <div id="inputAssetsBody">
+    </div>
+    <h4 id="inputMaxAndAll"></h4>
+    <div id="mainTable" style="display: flex">
+        <div id="processName" style="width: 10%; display: none">
+            进程名
+        </div>
+        <div id="maxInfo" style="width: 30%; display: none">
+            Max
+        </div>
+        <div id="allocationInfo" style="width: 30%; display: none">
+            Allocation
+        </div>
+        <div id="needInfo" style="width: 30%; display: none">
+            Need(无须输入，确认后自动算出)
+        </div>
+    </div>
+    <button id="finalButton" style="width:50px; display: none; margin-top: 10px">确认</button>
+    <h3 id="result" style="margin-top: 10px"></h3>
+    <h4 id="request"></h4>
+    <div id="requestDiv" style="display: none">
+        <div id="applyProcess">
+            <div>
+                申请资源
+            </div>
+            <div id="apply" style="display: flex">
+            </div>
+        </div>
+        <div id="releaseProcess">
+            释放资源
+            <div id="release" style="display: flex">
+            </div>
+        </div>
+        <div id="addProcess">
+            新增线程
+            <div id="add" style="display: flex">
+                <div style="margin-left: 40%">请输入新建资源的max分配情况</div>
+                <div  id="addPro" style="margin-left: 10px"></div>
+                <button id="addProButton" style="margin-left: 10px">新建进程</button>
+            </div>
+        </div>
+        <div>
+            <button style="width:50px; margin-top: 10px" onclick="reload()">
+                重开
+            </button>
+        </div>
+    </div>
+</div>
+</body>
+</html>
